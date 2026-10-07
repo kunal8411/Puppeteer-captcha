@@ -1,0 +1,18 @@
+{
+  "name": "checkbox-clicker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Open a page in Puppeteer and click a checkbox by its label text.",
+  "scripts": {
+    "start": "node select-checkbox.js",
+    "demo": "node select-checkbox.js --url demo/index.html --label \"select fname\""
+  },
+  "dependencies": {
+    "@tensorflow-models/coco-ssd": "^2.2.3",
+    "@tensorflow/tfjs-node": "^4.22.0",
+    "onnxruntime-node": "^1.19.2",
+    "puppeteer": "^24.22.0",
+    "sharp": "^0.35.5"
+  }
+}

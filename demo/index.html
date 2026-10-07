@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Checkbox demo</title>
+  </head>
+  <body>
+    <h1>Sample form</h1>
+
+    <p>
+      <label>
+        <input type="checkbox" name="lname" />
+        select lname
+      </label>
+    </p>
+
+    <p>
+      <input type="checkbox" id="fname" name="fname" />
+      <label for="fname">select fname</label>
+    </p>
+
+    <p>
+      <label>
+        <input type="checkbox" name="email" />
+        select email
+      </label>
+    </p>
+
+    <p>
+      <div id="custom-anchor" role="checkbox" aria-checked="false" tabindex="0" style="display: inline-flex; align-items: center; gap: 8px;">
+        <div class="sample-checkbox " role="presentation" style="width: 18px; height: 18px; border: 2px solid #333;"></div>
+        select sample
+      </div>
+    </p>
+
+    <p id="status">fname is not selected</p>
+    <p id="custom-status">sample checkbox is not selected</p>
+
+    <script>
+      const fname = document.getElementById("fname");
+      const status = document.getElementById("status");
+      fname.addEventListener("change", () => {
+        status.textContent = fname.checked
+          ? "fname is selected"
+          : "fname is not selected";
+      });
+
+      const custom = document.getElementById("custom-anchor");
+      const customStatus = document.getElementById("custom-status");
+      custom.addEventListener("click", () => {
+        const next = custom.getAttribute("aria-checked") !== "true";
+        custom.setAttribute("aria-checked", next ? "true" : "false");
+        customStatus.textContent = next
+          ? "sample checkbox is selected"
+          : "sample checkbox is not selected";
+      });
+    </script>
+  </body>
+</html>

@@ -8,6 +8,9 @@ ROOT = Path(__file__).resolve().parent
 CLASSES = [
     "person",
     "bicycle",
+    "motorcycles",
+    "motorcycle",
+    "crosswalks",
     "car",
     "motorcycle",
     "airplane",
@@ -16,7 +19,10 @@ CLASSES = [
     "truck",
     "boat",
     "traffic light",
+    "a traffic light",
+    "traffic signal"
     "fire hydrant",
+    "a fire hydrant",
     "stop sign",
     "parking meter",
     "bench",

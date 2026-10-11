@@ -265,7 +265,7 @@ async function clickOnce(page, labelText) {
  * Columns come from the first tile's row; rows are total / columns.
  */
 function measureTiles() {
-  const tiles = document.querySelectorAll(".rc-imageselect-tile");
+  const tiles = document.querySelectorAll(".rc-image-tile-wrapper");
   const total = tiles.length;
   const columns = tiles[0]?.parentElement?.children.length || 0;
   const rows = columns ? Math.ceil(total / columns) : 0;
@@ -300,21 +300,19 @@ async function loadImage(source) {
 }
 async function getGridImages(page) {
   for (const frame of page.frames()) {
-    console.log({frame});
+    // console.log({ frame });
     try {
-      const images = await frame.$$eval(
-        ".rc-image-tile-target",
-        tiles =>
-          tiles.map((tile, index) => {
-            const wrapper = tile.querySelector(".rc-image-tile-wrapper");
-            const img = wrapper?.querySelector("img");
+      const images = await frame.$$eval(".rc-image-tile-target", (tiles) =>
+        tiles.map((tile, index) => {
+          const wrapper = tile.querySelector(".rc-image-tile-wrapper");
+          const img = wrapper?.querySelector("img");
 
-            return {
-              index,
-              tileId: tile.id || null,
-              src: img?.src || null,
-            };
-          })
+          return {
+            index,
+            tileId: tile.id || null,
+            src: img?.src || null,
+          };
+        }),
       );
 
       if (images.length > 0) {
@@ -448,7 +446,107 @@ async function detectObjects(imageSource, targetText) {
     await fs.promises.unlink(file).catch(() => {});
   }
 }
+async function clickMatchingCells(page, results) {
+  const frames = page.frames();
 
+  for (const frame of frames) {
+    const cells = await frame.$$("td");
+
+    if (cells.length === 0) {
+      continue;
+    }
+
+    console.log("Frame:", frame.url());
+    console.log("TD count:", cells.length);
+
+    for (const result of results) {
+      if (!result.match) {
+        continue;
+      }
+
+      const { index } = result;
+      const cell = cells[index];
+
+      if (!cell) {
+        console.log(`Cell ${index} not found`);
+        continue;
+      }
+
+      console.log(`Matched cell: ${index}`);
+
+      // Inspect the matched cell.
+      // const cellInfo = await cell.evaluate((el) => ({
+      //   id: el.id,
+      //   className: el.className,
+      //   html: el.innerHTML,
+      // }));
+
+      // console.log(cellInfo);
+      await cell.click();
+
+      // For the sample image grid, locate the
+      // child element you want to interact with here.
+      // const target = await cell.$(".rc-imageselect-tile");
+
+      // if (!target) {
+      //   console.log(`Target element not found in cell ${index}`);
+      //   continue;
+      // }
+
+      // console.log(`Target found in cell ${index}`);
+
+      // // Generic application-grid interaction:
+      // await target.click();
+    }
+
+    // We found the grid, so don't inspect every other frame.
+    break;
+  }
+}
+// rc-button-default goog-inline-block
+async function verifyButton1(page) {
+  for (const [index, frame] of page.frames().entries()) {
+    console.log(`\n--- Frame ${index} ---`);
+    console.log("URL:", frame.url());
+
+    const buttons = await frame.$$("button");
+
+    console.log("Buttons found:", buttons.length);
+
+    for (const button of buttons) {
+      const info = await button.evaluate((el) => ({
+        id: el.id,
+        className: el.className,
+        text: el.textContent?.trim(),
+        outerHTML: el.outerHTML,
+      }));
+
+      console.log(info);
+    }
+  }
+}
+async function verifyButton(page) {
+  for (const frame of page.frames()) {
+    const buttons = await frame.$$("button");
+
+    for (const button of buttons) {
+      const text = await button.evaluate(
+        el => el.textContent?.trim()
+      );
+
+      if (text === "Verify") {
+        console.log("Verify button found");
+
+        await button.click();
+
+        console.log("Verify button clicked");
+        return;
+      }
+    }
+  }
+
+  console.log("Verify button not found");
+}
 async function main() {
   const target = readArg("url", "demo/index.html");
   const label = readArg("label", "select fname");
@@ -472,15 +570,15 @@ async function main() {
     return;
   }
 
-  console.log(
-    `Clicked "${label}" (${result.how}${result.name ? `, name: ${result.name}` : ""}). Checked: ${result.checked}`,
-  );
+  // console.log(
+  //   `Clicked "${label}" (${result.how}${result.name ? `, name: ${result.name}` : ""}). Checked: ${result.checked}`,
+  // );
 
   const { total, rows, columns } = await readTileGrid(page);
   const images = await getGridImages(page);
-  console.log({ images });
+  // console.log({ images });
   const targetText = await readTargetText(page);
-  console.log({ targetText });
+  // console.log({ targetText });
   const srcs = new Set(images.map((image) => image.src).filter(Boolean));
   const splitGrid = srcs.size === 1 && rows > 1 && columns > 1;
   const results = [];
@@ -489,13 +587,13 @@ async function main() {
     const buffer = await loadImage(images[0].src);
     const meta = await sharp(buffer).metadata();
     const detected = await detectObjects(buffer, targetText);
-    console.log({
-      found: detected.objects.map((object) => ({
-        label: object.label,
-        confidence: object.confidence,
-        box: object.box,
-      })),
-    });
+    // console.log({
+    //   found: detected.objects.map((object) => ({
+    //     label: object.label,
+    //     confidence: object.confidence,
+    //     box: object.box,
+    //   })),
+    // });
     for (const image of images) {
       results.push({
         index: image.index,
@@ -525,28 +623,31 @@ async function main() {
       }
     }
     for (const tile of results) {
-      console.log({
-        index: tile.index,
-        match: tile.match,
-        matches: tile.matches.map((object) => object.label),
-      });
+      // console.log({
+      //   index: tile.index,
+      //   match: tile.match,
+      //   matches: tile.matches.map((object) => object.label),
+      // });
     }
   } else if (images.length > 0) {
     for (const image of images) {
       if (!image.src) continue;
       const result = await detectObjects(image.src, targetText);
       results.push({ index: image.index, ...result });
-      console.log({
-        index: image.index,
-        match: result.match,
-        matches: result.matches.map((object) => object.label),
-      });
+      // console.log({
+      //   index: image.index,
+      //   match: result.match,
+      //   matches: result.matches.map((object) => object.label),
+      // });
     }
   }
 
   console.log({ results });
+  await clickMatchingCells(page, results);
+  await verifyButton(page);
+
   console.log({ total, rows, columns });
-  
+
   if (!total) {
     console.error("Could not find image tiles to measure rows and columns.");
   }

@@ -474,67 +474,25 @@ async function clickMatchingCells(page, results) {
 
       console.log(`Matched cell: ${index}`);
 
-      // Inspect the matched cell.
-      // const cellInfo = await cell.evaluate((el) => ({
-      //   id: el.id,
-      //   className: el.className,
-      //   html: el.innerHTML,
-      // }));
-
-      // console.log(cellInfo);
+     
       await cell.click();
 
-      // For the sample image grid, locate the
-      // child element you want to interact with here.
-      // const target = await cell.$(".rc-imageselect-tile");
-
-      // if (!target) {
-      //   console.log(`Target element not found in cell ${index}`);
-      //   continue;
-      // }
-
-      // console.log(`Target found in cell ${index}`);
-
-      // // Generic application-grid interaction:
-      // await target.click();
+     
     }
 
     // We found the grid, so don't inspect every other frame.
     break;
   }
 }
-// rc-button-default goog-inline-block
-async function verifyButton1(page) {
-  for (const [index, frame] of page.frames().entries()) {
-    console.log(`\n--- Frame ${index} ---`);
-    console.log("URL:", frame.url());
 
-    const buttons = await frame.$$("button");
-
-    console.log("Buttons found:", buttons.length);
-
-    for (const button of buttons) {
-      const info = await button.evaluate((el) => ({
-        id: el.id,
-        className: el.className,
-        text: el.textContent?.trim(),
-        outerHTML: el.outerHTML,
-      }));
-
-      console.log(info);
-    }
-  }
-}
 async function verifyButton(page) {
   for (const frame of page.frames()) {
     const buttons = await frame.$$("button");
 
     for (const button of buttons) {
-      const text = await button.evaluate(
-        el => el.textContent?.trim()
-      );
+      const text = await button.evaluate((el) => el.textContent?.trim());
 
-      if (text === "Verify") {
+      if (text === "Verify" || text === "Submit" || text === "Next") {
         console.log("Verify button found");
 
         await button.click();
@@ -547,6 +505,11 @@ async function verifyButton(page) {
 
   console.log("Verify button not found");
 }
+
+
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function main() {
   const target = readArg("url", "demo/index.html");
   const label = readArg("label", "select fname");
@@ -569,92 +532,65 @@ async function main() {
     );
     return;
   }
+  
 
-  // console.log(
-  //   `Clicked "${label}" (${result.how}${result.name ? `, name: ${result.name}` : ""}). Checked: ${result.checked}`,
-  // );
+  for (let index = 0; index < 5; index++) {
+    console.log(`Starting iteration ${index + 1}`);
+   
+    const { total, rows, columns } = await readTileGrid(page);
+    const images = await getGridImages(page);
+    const targetText = await readTargetText(page);
+    const srcs = new Set(images.map((image) => image.src).filter(Boolean));
+    const splitGrid = srcs.size === 1 && rows > 1 && columns > 1;
+    const results = [];
 
-  const { total, rows, columns } = await readTileGrid(page);
-  const images = await getGridImages(page);
-  // console.log({ images });
-  const targetText = await readTargetText(page);
-  // console.log({ targetText });
-  const srcs = new Set(images.map((image) => image.src).filter(Boolean));
-  const splitGrid = srcs.size === 1 && rows > 1 && columns > 1;
-  const results = [];
+    if (splitGrid) {
+      const buffer = await loadImage(images[0].src);
+      const meta = await sharp(buffer).metadata();
+      const detected = await detectObjects(buffer, targetText);
 
-  if (splitGrid) {
-    const buffer = await loadImage(images[0].src);
-    const meta = await sharp(buffer).metadata();
-    const detected = await detectObjects(buffer, targetText);
-    // console.log({
-    //   found: detected.objects.map((object) => ({
-    //     label: object.label,
-    //     confidence: object.confidence,
-    //     box: object.box,
-    //   })),
-    // });
-    for (const image of images) {
-      results.push({
-        index: image.index,
-        match: false,
-        targetText,
-        matches: [],
-        objects: [],
-      });
-    }
-    for (const object of detected.objects) {
-      const cells = cellsForBox(
-        object.box,
-        rows,
-        columns,
-        meta.width,
-        meta.height,
-      );
-      const isMatch = labelMatchesTarget(object.label, targetText);
-      for (const index of cells) {
-        const tile = results.find((item) => item.index === index);
-        if (!tile) continue;
-        tile.objects.push(object);
-        if (isMatch) {
-          tile.matches.push(object);
-          tile.match = true;
+      for (const image of images) {
+        results.push({
+          index: image.index,
+          match: false,
+          targetText,
+          matches: [],
+          objects: [],
+        });
+      }
+      for (const object of detected.objects) {
+        const cells = cellsForBox(
+          object.box,
+          rows,
+          columns,
+          meta.width,
+          meta.height,
+        );
+        const isMatch = labelMatchesTarget(object.label, targetText);
+        for (const index of cells) {
+          const tile = results.find((item) => item.index === index);
+          if (!tile) continue;
+          tile.objects.push(object);
+          if (isMatch) {
+            tile.matches.push(object);
+            tile.match = true;
+          }
         }
       }
+    } else if (images.length > 0) {
+      for (const image of images) {
+        if (!image.src) continue;
+        const result = await detectObjects(image.src, targetText);
+        results.push({ index: image.index, ...result });
+      }
     }
-    for (const tile of results) {
-      // console.log({
-      //   index: tile.index,
-      //   match: tile.match,
-      //   matches: tile.matches.map((object) => object.label),
-      // });
-    }
-  } else if (images.length > 0) {
-    for (const image of images) {
-      if (!image.src) continue;
-      const result = await detectObjects(image.src, targetText);
-      results.push({ index: image.index, ...result });
-      // console.log({
-      //   index: image.index,
-      //   match: result.match,
-      //   matches: result.matches.map((object) => object.label),
-      // });
-    }
+
+    await clickMatchingCells(page, results);
+    await verifyButton(page);
+    await delay(10000);
   }
 
-  console.log({ results });
-  await clickMatchingCells(page, results);
-  await verifyButton(page);
-
-  console.log({ total, rows, columns });
-
-  if (!total) {
-    console.error("Could not find image tiles to measure rows and columns.");
-  }
-
-  console.log("Browser stays open. Press Ctrl+C when you are done.");
-
-  await new Promise(() => {});
+ 
 }
 
 const isDirectRun =
